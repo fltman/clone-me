@@ -1,0 +1,16 @@
+{
+  "name": "clone-me",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "setup": "node scripts/setup.mjs",
+    "start": "node server.mjs"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^1.6.0",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "playwright-core": "^1.65.0"
+  }
+}

@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="sv">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>clone-me</title>
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+<style>
+  /* Byggd för videokanon inför ~300 personer: få element, stor text, allt skalar med skärmbredden
+     (≈38 px brödtext på en 1920 px bred duk). */
+  :root {
+    --bg: #030604;
+    --panel: rgba(18, 48, 30, 0.22);
+    --g: #45ff96;          /* fosfor */
+    --g2: #34d27c;         /* dämpad, men läsbar på projektor */
+    --g3: #1d7444;         /* linjer */
+    --amber: #ffb340;      /* syntesen */
+    --red: #ff4545;
+    --mono: "VT323", ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body { margin: 0; background: #000; color: var(--g); font: clamp(18px, 2vw, 52px)/1.12 var(--mono); overflow: hidden; }
+  .hidden { display: none !important; }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  /* ---------- vila: militär vippbrytare under skyddslock ---------- */
+  #idle { position: fixed; inset: 0; display: grid; place-items: center; background: #000; }
+  #go { all: unset; cursor: pointer; perspective: 900px; }
+  #go:focus-visible .plate { outline: 3px solid var(--g); outline-offset: 12px; }
+  .plate {
+    position: relative; display: block; width: 34vmin; height: 46vmin; border-radius: 2.2vmin;
+    background: linear-gradient(160deg, #4a4f43 0%, #33372e 45%, #24271f 100%);
+    box-shadow: inset 0 .4vmin 0 rgba(255,255,255,.12), inset 0 -.6vmin 1vmin rgba(0,0,0,.5), 0 2vmin 5vmin rgba(0,0,0,.8);
+  }
+  .screw { position: absolute; width: 2.4vmin; height: 2.4vmin; border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%, #9a9e92, #4d5047 60%, #2b2d26);
+    box-shadow: inset 0 0 .3vmin rgba(0,0,0,.6); }
+  .screw::after { content: ""; position: absolute; left: 15%; right: 15%; top: 45%; height: 10%; background: #22241e; transform: rotate(35deg); }
+  .screw.a { top: 2vmin; left: 2vmin; } .screw.b { top: 2vmin; right: 2vmin; } .screw.c { bottom: 2vmin; left: 2vmin; } .screw.d { bottom: 2vmin; right: 2vmin; }
+  .led { position: absolute; top: 6vmin; left: 50%; width: 5vmin; height: 5vmin; margin-left: -2.5vmin; border-radius: 50%;
+    background: radial-gradient(circle at 40% 35%, #b6ffd2, #2fe57a 40%, #0b6d35 75%, #062a15);
+    box-shadow: 0 0 0 .7vmin #1b1d18, 0 0 3vmin 1vmin rgba(69,255,150,.6);
+    animation: ledpulse 1.6s ease-in-out infinite; }
+  @keyframes ledpulse { 50% { filter: brightness(.45); box-shadow: 0 0 0 .7vmin #1b1d18, 0 0 1vmin 0 rgba(69,255,150,.25); } }
+  .well { position: absolute; left: 50%; top: 17vmin; width: 15vmin; height: 22vmin; margin-left: -7.5vmin; border-radius: 1.2vmin;
+    background: radial-gradient(ellipse at 50% 50%, #15170f, #0b0c08); box-shadow: inset 0 .8vmin 1.6vmin rgba(0,0,0,.9); }
+  .nut { position: absolute; left: 50%; top: 50%; width: 7vmin; height: 7vmin; margin: -3.5vmin; border-radius: 50%;
+    background: radial-gradient(circle at 40% 35%, #c8ccc0, #6b6f63 55%, #33362d); box-shadow: 0 .4vmin .8vmin rgba(0,0,0,.7); }
+  .lever { position: absolute; left: 50%; top: 50%; width: 2.6vmin; height: 10vmin; margin-left: -1.3vmin; border-radius: 1.3vmin;
+    background: linear-gradient(90deg, #6e7266, #f0f2ea 45%, #8d9185 70%, #50534a);
+    transform-origin: 50% 0; transform: rotate(180deg); transition: transform .18s cubic-bezier(.5,1.8,.6,1); box-shadow: 0 .6vmin 1vmin rgba(0,0,0,.6); }
+  .lever::after { content: ""; position: absolute; left: -.6vmin; right: -.6vmin; bottom: -1vmin; height: 3.4vmin; border-radius: 1.7vmin;
+    background: radial-gradient(circle at 40% 35%, #ffffff, #a7ab9f 60%, #5d6056); }
+  .cover { position: absolute; left: 50%; top: 15.5vmin; width: 19vmin; height: 25vmin; margin-left: -9.5vmin; border-radius: 1.4vmin;
+    background: repeating-linear-gradient(135deg, rgba(214,40,32,.82) 0 2.2vmin, rgba(25,20,18,.82) 2.2vmin 4.4vmin);
+    border: .5vmin solid #8f1d17; box-shadow: inset 0 0 2vmin rgba(255,255,255,.18), 0 1vmin 2vmin rgba(0,0,0,.6);
+    transform-origin: 50% 0; transition: transform .45s cubic-bezier(.3,1.4,.5,1); }
+  .cover::before { content: ""; position: absolute; left: 30%; right: 30%; top: -1.6vmin; height: 1.6vmin; border-radius: .6vmin .6vmin 0 0; background: #5b5f53; }
+  #go.armed .cover { transform: rotateX(-118deg); }
+  #go.on .lever { transform: rotate(0deg); }
+  #go.on .led { animation: none; filter: brightness(1.3); box-shadow: 0 0 0 .7vmin #1b1d18, 0 0 6vmin 2vmin rgba(69,255,150,.85); }
+
+  /* ---------- uppstart ---------- */
+  #boot { position: fixed; inset: 0; background: #000; color: var(--g); font-size: 1.5em; padding: 14vh 8vw; white-space: pre-wrap; z-index: 8;
+    text-shadow: 0 0 6px rgba(69,255,150,.75), 0 0 20px rgba(69,255,150,.25); }
+  #boot.cur::after { content: "█"; animation: blink .8s steps(1) infinite; }
+
+  /* ---------- analytikerns skärm (CRT) ---------- */
+  #hud { position: fixed; inset: .6vw; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; gap: .45em; padding: .6em .8em;
+    background: radial-gradient(ellipse at 50% 40%, #082013 0%, var(--bg) 70%); border-radius: 1.4vw;
+    box-shadow: inset 0 0 6vw rgba(0,0,0,.85), inset 0 0 1.2vw rgba(69,255,150,.08), 0 0 0 2px #0a160f;
+    animation: flicker 6s infinite; text-shadow: 0 0 4px rgba(69,255,150,.6), 0 0 14px rgba(69,255,150,.16); }
+  @keyframes flicker { 0%, 47%, 100% { filter: brightness(1); } 48% { filter: brightness(.86); } 49% { filter: brightness(1.04); } 50% { filter: brightness(.95); } }
+  #hud::before { content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 5;
+    background: repeating-linear-gradient(to bottom, rgba(0,0,0,0) 0 3px, rgba(0,0,0,.1) 3px 4px); }
+  #hud .roll { position: fixed; left: 0; right: 0; height: 18vh; pointer-events: none; z-index: 4;
+    background: linear-gradient(to bottom, rgba(69,255,150,0), rgba(69,255,150,.05), rgba(69,255,150,0)); animation: roll 7s linear infinite; }
+  @keyframes roll { from { top: -18vh; } to { top: 100%; } }
+
+  header { display: flex; flex-wrap: wrap; gap: .2em .8em; align-items: center; border-bottom: 2px solid var(--g3); padding-bottom: .3em; letter-spacing: .06em; }
+  header .rec { color: var(--red); }
+  header .rec::before { content: "●"; margin-right: .3em; animation: blink 1s steps(1) infinite; }
+  header .spacer { flex: 1; }
+  header .dim { color: var(--g2); }
+  .levels { display: flex; gap: .25em; align-items: center; }
+  .levels b { display: inline-grid; place-items: center; width: 1.7em; height: 1.25em; border: 2px solid var(--g2); font-weight: 400; color: var(--g2); }
+  .levels b.on { background: var(--g); color: #021; text-shadow: none; box-shadow: 0 0 .6em var(--g); animation: lvl 1.4s ease-in-out infinite; }
+  .levels b.on.l2 { background: var(--amber); border-color: var(--amber); box-shadow: 0 0 .6em var(--amber); }
+  .levels b.on.l1 { background: var(--red); border-color: var(--red); box-shadow: 0 0 .7em var(--red); }
+  @keyframes lvl { 50% { filter: brightness(.7); } }
+
+  main { display: grid; grid-template-columns: 1fr 1.55fr 1fr; gap: .45em; min-height: 0; }
+  .col { display: flex; flex-direction: column; gap: .45em; min-height: 0; }
+  .panel { position: relative; border: 2px solid var(--g3); background: var(--panel); padding: .3em .45em .4em; min-height: 0; overflow: hidden; flex: none; }
+  .panel::before, .panel::after { content: ""; position: absolute; width: .4em; height: .4em; border: 2px solid var(--g2); }
+  .panel::before { top: -2px; left: -2px; border-right: 0; border-bottom: 0; }
+  .panel::after { bottom: -2px; right: -2px; border-left: 0; border-top: 0; }
+  .panel h2 { margin: 0 0 .15em; font-size: .72em; font-weight: 400; letter-spacing: .14em; color: var(--g2); display: flex; justify-content: space-between; }
+  .panel.grow { flex: 1 1 0; }
+
+  dl { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 0 .5em; margin: 0; }
+  dt { color: var(--g2); font-size: .72em; letter-spacing: .08em; align-self: center; }
+  dd { margin: 0; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pending { color: var(--g2); animation: pulse 1.6s ease-in-out infinite; }
+  @keyframes pulse { 50% { opacity: .35; } }
+  ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+  li { position: relative; padding-left: .6em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-transform: uppercase; flex: none; }
+  li::before { content: "›"; position: absolute; left: 0; color: var(--g2); }
+  .new { animation: flash 2.4s ease-out; }
+  .mq { display: inline-block; animation: mq var(--d) ease-in-out infinite alternate; }
+  @keyframes mq { 0%, 18% { transform: translateX(0); } 82%, 100% { transform: translateX(var(--x)); } }
+  @keyframes flash { 0% { background: rgba(69,255,150,.4); color: #fff; } 100% { background: transparent; } }
+  .tags { display: flex; flex-wrap: wrap; gap: .2em .25em; }
+  .tag { border: 2px solid var(--g2); padding: 0 .25em; text-transform: uppercase; white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+  .tag b { color: var(--amber); font-weight: 400; margin-left: .25em; }
+
+  .scope { position: relative; height: 15vh; }
+  canvas { width: 100%; height: 100%; display: block; }
+  .scope .lbl { position: absolute; font-size: .6em; letter-spacing: .12em; }
+  .scope .l1 { top: 0; left: .2em; color: var(--g); }
+  .scope .l2 { bottom: 0; left: .2em; color: var(--amber); }
+  .scope .who { position: absolute; top: 0; right: .2em; font-size: .7em; letter-spacing: .1em; }
+
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: .4em; }
+  .stat .k { color: var(--g2); font-size: .6em; letter-spacing: .1em; }
+  .stat .v { font-size: 1.9em; line-height: .95; }
+  .bar { height: .18em; background: var(--g3); margin-top: .1em; }
+  .bar i { display: block; height: 100%; background: var(--g); width: 0; transition: width 1.2s ease; box-shadow: 0 0 .3em var(--g); }
+
+  /* Händelseloggen: raderna behåller sin höjd; nya läggs till nertill och de äldsta försvinner upptill. */
+  #feedPanel { display: flex; flex-direction: column; }
+  #feed { flex: 1 1 0; min-height: 0; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end; }
+  #feed .row { flex: none; line-height: 1.15; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #feed .warn { color: var(--amber); }
+  #feed .crit { color: var(--red); }
+  #feed .cur::after { content: "█"; animation: blink .8s steps(1) infinite; }
+
+  footer { display: flex; justify-content: space-between; align-items: center; gap: .6em; border-top: 2px solid var(--g3); padding-top: .25em; letter-spacing: .06em; color: var(--g2); font-size: .7em; }
+  footer button { font: inherit; letter-spacing: .12em; background: none; color: var(--red); border: 2px solid rgba(255,69,69,.5); padding: .1em .6em; cursor: pointer; }
+  footer button:hover { background: rgba(255,69,69,.12); }
+
+  /* ---------- radering ---------- */
+  .erased { color: var(--red) !important; border-color: var(--red) !important; animation: redpulse 1.1s ease-in-out infinite; }
+  @keyframes redpulse { 0%, 100% { opacity: 1; text-shadow: 0 0 8px rgba(255,69,69,.85); } 50% { opacity: .4; text-shadow: none; } }
+  #hud.erasing .panel { border-color: rgba(255,69,69,.4); }
+  #hud.erasing .bar i { background: var(--red); box-shadow: 0 0 .3em var(--red); }
+  #hud.erasing .rec { animation: redpulse 1.1s ease-in-out infinite; }
+  #wipe { position: fixed; inset: 0; z-index: 7; display: grid; place-items: center; pointer-events: none; opacity: 0; transition: opacity .8s; }
+  #wipe.on { opacity: 1; background: rgba(3,6,4,.85); }
+  #wipe div { color: var(--red); font-size: 3.6em; letter-spacing: .12em; text-align: center; line-height: 1; animation: redpulse 1.1s ease-in-out infinite; }
+  #wipe small { display: block; font-size: .32em; letter-spacing: .14em; margin-top: .6em; }
+
+  @media (max-aspect-ratio: 1/1) {
+    body { overflow: auto; font-size: 18px; }
+    #hud { position: static; min-height: 100%; }
+    main { grid-template-columns: 1fr; }
+    #feedPanel { height: 60vh; }
+  }
+</style>
+</head>
+<body>
+
+<div id="idle">
+  <button id="go" aria-label="Starta">
+    <span class="plate">
+      <span class="screw a"></span><span class="screw b"></span><span class="screw c"></span><span class="screw d"></span>
+      <span class="led"></span>
+      <span class="well"><span class="nut"></span><span class="lever"></span></span>
+      <span class="cover"></span>
+    </span>
+  </button>
+</div>
+
+<div id="boot" class="hidden"></div>
+
+<div id="hud" class="hidden">
+  <div class="roll"></div>
+  <header>
+    <span>SUBJEKT <b id="subj">—</b></span>
+    <span class="rec">AVLYSSNING AKTIV</span>
+    <span class="dim" id="clock">00:00:00</span>
+    <span class="spacer"></span>
+    <span class="dim" id="phase">FRÄMLINGEN</span>
+    <span class="levels"><b class="l4">4</b><b class="l3">3</b><b class="l2">2</b><b class="l1">1</b></span>
+  </header>
+
+  <main>
+    <div class="col">
+      <section class="panel"><h2>IDENTITET</h2><dl id="ident"></dl></section>
+      <section class="panel"><h2>FAMILJEFÖRHÅLLANDEN</h2><ul id="people"></ul></section>
+      <section class="panel grow"><h2>INTRESSEN</h2><div class="tags" id="interests"></div></section>
+    </div>
+
+    <div class="col">
+      <section class="panel"><h2>RÖSTSIGNATUR <span id="voiceState">INSAMLING</span></h2>
+        <div class="scope">
+          <canvas id="scope"></canvas>
+          <span class="lbl l1">SUBJEKT</span>
+          <span class="lbl l2">SYNTES</span>
+          <span class="who" id="who"></span>
+        </div>
+      </section>
+      <section class="panel stats">
+        <div class="stat"><div class="k">RÖSTMATERIAL</div><div class="v" id="sSec">0 S</div><div class="bar"><i id="bSec"></i></div></div>
+        <div class="stat"><div class="k">RÖSTMODELL</div><div class="v" id="sModel">—</div><div class="bar"><i id="bModel"></i></div></div>
+        <div class="stat"><div class="k">LIKHET</div><div class="v" id="sLike">0 %</div><div class="bar"><i id="bLike"></i></div></div>
+      </section>
+      <section class="panel grow" id="feedPanel"><h2>HÄNDELSELOGG</h2><div id="feed"></div></section>
+    </div>
+
+    <div class="col">
+      <section class="panel"><h2>TYPISKA FRASER</h2><ul id="phrases"></ul></section>
+      <section class="panel"><h2>UTFYLLNADSORD</h2><div class="tags" id="fillers"></div></section>
+      <section class="panel grow"><h2>RÖSTANALYS</h2><dl id="lang"></dl></section>
+    </div>
+  </main>
+
+  <footer>
+    <span id="foot">ANSLUTER …</span>
+    <span>ALLT RADERAS NÄR AVLYSSNINGEN AVSLUTAS</span>
+    <button id="endBtn">AVSLUTA OCH RADERA</button>
+  </footer>
+</div>
+
+<div id="wipe"><div id="wipeText"></div></div>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>
