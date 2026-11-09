@@ -69,7 +69,7 @@ async function startCall() {
     });
     call = {
       stream, t0: performance.now(), speaking: [], open: null, queue: [], all: [], uploads: Promise.resolve(),
-      active: null, standby: null, relaying: false, relayWanted: 0, sentContextSeq: live?.contextSeq || 0, ending: false,
+      active: null, standby: null, finishing: new Set(), relaying: false, relayWanted: 0, sentContextSeq: live?.contextSeq || 0, ending: false,
     };
     const start = await api('POST', `/api/p/${pid}/start`);
     call.active = await openSession('A', start);
@@ -115,8 +115,18 @@ function onMessage(sess, m) {
   hud.line(line);
 }
 
+// Agenten hörs om det aktiva samtalet eller ett som håller på att prata klart pratar.
+// Intervallen används för att tysta agentens röst ur inspelningen av dig.
+function audibleChanged() {
+  const on = [call.active, ...call.finishing].some((x) => x?.mode === 'speaking');
+  if (on && call.open == null) call.open = t();
+  if (!on && call.open != null) { call.speaking.push([call.open, t()]); call.open = null; }
+  hud.speaking(on ? 'synth' : 'idle');
+}
+
 function onMode(sess, mode) {
   if (!call) return;
+  if (call.finishing.has(sess)) { sess.mode = mode; sess.quietSince = mode === 'speaking' ? 0 : performance.now(); audibleChanged(); return; }
   if (sess !== call.active) {
     sess.mode = mode;
     if (mode === 'speaking' && sess === call.standby) discardStandby('började prata');
@@ -124,16 +134,15 @@ function onMode(sess, mode) {
   }
   const was = sess.mode;
   sess.mode = mode;
-  if (mode === 'speaking' && call.open == null) call.open = t();
-  if (mode !== 'speaking' && call.open != null) { call.speaking.push([call.open, t()]); call.open = null; }
-  hud.speaking(mode === 'speaking' ? 'synth' : 'idle');
+  audibleChanged();
   // Uppkopplingen sker medan agenten pratar; bytet precis när den pratat klart.
   if (mode === 'speaking' && call.relayWanted && !call.standby && !call.relaying) prepareRelay();
   if (was === 'speaking' && mode !== 'speaking' && call.standby?.ready && call.standby.mode !== 'speaking') handoff();
 }
 
 function onDisconnect(sess, d) {
-  if (!call || sess.retired) return;
+  if (call) call.finishing.delete(sess);
+  if (!call || sess.retired || sess.finishing) return;
   if (sess === call.standby) { note(`väntande samtal ${sess.id} kopplades ner (${d?.reason})`); call.standby = null; return; }
   if (sess === call.active && !call.ending) {
     if (d?.reason === 'user') return endCall();
@@ -232,7 +241,7 @@ function handoff() {
   B.convo.setVolume({ volume: 1 });
   B.convo.setMicMuted(false);
   call.active = B; call.standby = null;
-  retire(A);
+  finishThenRetire(A); // låt den prata klart
   const ms = Math.round(performance.now() - t0);
   note(`stafettbyte: samtal ${A.id} → ${B.id}`);
   hud.feed(B.voiceSeq ? `RÖSTMODELL V${B.voiceSeq} INKOPPLAD I SYNTESEN` : 'SYNTES OMKOPPLAD', 'warn');
@@ -241,8 +250,33 @@ function handoff() {
 
 function retire(sess) {
   sess.retired = true;
+  call?.finishing.delete(sess);
   try { sess.convo.setMicMuted(true); } catch {}
   sess.convo.endSession().catch(() => {});
+}
+
+// Vid stafettbytet får det gamla samtalet prata klart med mikrofonen avstängd. Agenten går kort över till
+// "lyssnar" mellan meningar, så att lägga på direkt kapade resten av repliken. Läggs på efter 1,5 s tystnad.
+const FINISH_QUIET_MS = 1500, FINISH_MAX_MS = 25_000;
+function finishThenRetire(sess) {
+  sess.finishing = true;
+  try { sess.convo.setMicMuted(true); } catch {}
+  call.finishing.add(sess);
+  const born = performance.now();
+  sess.quietSince = sess.mode === 'speaking' ? 0 : performance.now();
+  const iv = setInterval(() => {
+    let vol = 0;
+    try { vol = sess.convo.getOutputVolume(); } catch {}
+    if (sess.mode === 'speaking' || vol > 0.01) sess.quietSince = 0;
+    else if (!sess.quietSince) sess.quietSince = performance.now();
+    const quiet = sess.quietSince && performance.now() - sess.quietSince > FINISH_QUIET_MS;
+    if (quiet || performance.now() - born > FINISH_MAX_MS || !call) {
+      clearInterval(iv);
+      sess.mode = 'listening';
+      retire(sess);
+      if (call) audibleChanged();
+    }
+  }, 150);
 }
 
 // ---------- ljudbitar ----------
@@ -279,6 +313,7 @@ async function endCall() {
   clearInterval(c.chunkTimer); clearInterval(c.pollTimer);
   hud.feed('AVLYSSNING AVSLUTAS', 'warn');
   if (c.standby) retire(c.standby);
+  for (const f of [...c.finishing]) retire(f);
   if (c.active) retire(c.active);
   log('avslut: väntar på sista ljudbiten');
   await new Promise((res) => { const r = c.rec; r.stopAt = t(); const prev = r.onstop; r.onstop = () => { prev(); res(); }; r.stop(); });

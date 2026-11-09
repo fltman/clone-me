@@ -25,15 +25,7 @@ export function idle() {
   clearInterval(clockTimer); clearInterval(pitchTimer); cancelAnimationFrame(raf);
   if (mic) { mic.ctx.close().catch(() => {}); mic = null; }
 }
-// ---------- teleprinterklick ----------
-let sfx = null;
-function click(vol = 1) {
-  if (!sfx) return;
-  const t = sfx.currentTime, o = sfx.createOscillator(), g = sfx.createGain();
-  o.type = 'square'; o.frequency.value = 1700 + Math.random() * 900;
-  g.gain.setValueAtTime(0.018 * vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.012);
-  o.connect(g).connect(sfx.destination); o.start(t); o.stop(t + 0.015);
-}
+let sfx = null; // ljud för brytarens klack
 
 // ---------- uppstart (medan samtalet kopplas upp) ----------
 const BOOT = [
@@ -63,7 +55,7 @@ export async function dialing() {
   const el = $('boot');
   el.textContent = ''; el.classList.remove('hidden'); el.classList.add('cur');
   for (const line of BOOT) {
-    for (const ch of line) { el.textContent += ch; if (ch !== '.' && ch !== ' ') click(0.8); await new Promise((r) => setTimeout(r, ch === '.' ? 4 : 16)); }
+    for (const ch of line) { el.textContent += ch; await new Promise((r) => setTimeout(r, ch === '.' ? 4 : 16)); }
     el.textContent += '\n';
     await new Promise((r) => setTimeout(r, 140));
   }
@@ -132,7 +124,6 @@ function typeNext() {
   const iv = setInterval(() => {
     i += fast ? 3 : 1;
     tx.textContent = item.text.slice(0, i);
-    if (!fast || i % 3 === 0) click(fast ? 0.5 : 1);
     if (i >= item.text.length) { clearInterval(iv); tx.classList.remove('cur'); scrollIfClipped(row); setTimeout(typeNext, 60); }
   }, fast ? 8 : 24);
 }
