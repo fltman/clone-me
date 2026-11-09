@@ -14,6 +14,16 @@ let seen = new Set();        // steg som redan visats
 let heard = [];              // avlyssnade repliker (bara den här sessionen)
 let pitches = [], pitchAnnounced = false, pitchTimer = null;
 
+// Bygg bara om en panel när innehållet faktiskt ändrats. Annars startar rullande text om varannan
+// sekund (vid varje uppdatering från servern) och hinner aldrig röra sig. Blink-markeringen räknas inte.
+function setHTML(el, html) {
+  const key = html.replace(/ new\b/g, '');
+  if (el._key === key) return false;
+  el._key = key;
+  el.innerHTML = html;
+  return true;
+}
+
 // ---------- vy-byte ----------
 export function idle() {
   $('boot').classList.add('hidden');
@@ -72,10 +82,10 @@ export function start(stream, pid) {
   document.querySelector('header .rec').textContent = 'AVLYSSNING AKTIV';
   for (const el of document.querySelectorAll('.erased')) el.classList.remove('erased');
   const pend = '<span class="pending">INSAMLING PÅGÅR</span>';
-  $('ident').innerHTML = ['NAMN', 'ORT', 'YRKE'].map((k) => `<dt>${k}</dt><dd>${pend}</dd>`).join('');
-  for (const id of ['people', 'phrases']) $(id).innerHTML = `<li>${pend}</li>`;
-  for (const id of ['interests', 'fillers']) $(id).innerHTML = pend;
-  $('lang').innerHTML = langRows(null);
+  setHTML($('ident'), ['NAMN', 'ORT', 'YRKE'].map((k) => `<dt>${k}</dt><dd>${pend}</dd>`).join(''));
+  for (const id of ['people', 'phrases']) setHTML($(id), `<li>${pend}</li>`);
+  for (const id of ['interests', 'fillers']) setHTML($(id), pend);
+  setHTML($('lang'), langRows(null)); showPitch();
   clockTimer = setInterval(tick, 1000); tick();
   const ctx = new AudioContext();
   const an = ctx.createAnalyser(); an.fftSize = 2048;
@@ -124,7 +134,7 @@ function typeNext() {
   const iv = setInterval(() => {
     i += fast ? 3 : 1;
     tx.textContent = item.text.slice(0, i);
-    if (i >= item.text.length) { clearInterval(iv); tx.classList.remove('cur'); scrollIfClipped(row); setTimeout(typeNext, 60); }
+    if (i >= item.text.length) { clearInterval(iv); tx.classList.remove('cur'); setTimeout(typeNext, 60); }
   }, fast ? 8 : 24);
 }
 
@@ -189,21 +199,21 @@ function diffProfile(a, b, quiet) {
   const newSet = (x, y) => new Set(quiet ? [] : added(x, y).map((v) => v.toLowerCase()));
   const pend = '<span class="pending">INSAMLING PÅGÅR</span>';
   const dd = (k, v, old) => `<dt>${k}</dt><dd class="${!quiet && v && v !== old ? 'new' : ''}">${v ? esc(v) : pend}</dd>`;
-  $('ident').innerHTML = dd('NAMN', f.name, pf.name) + dd('ORT', f.hometown, pf.hometown) + dd('YRKE', f.occupation, pf.occupation);
+  setHTML($('ident'), dd('NAMN', f.name, pf.name) + dd('ORT', f.hometown, pf.hometown) + dd('YRKE', f.occupation, pf.occupation));
 
   const list = (el, xs, nu, fmt = esc) => {
-    $(el).innerHTML = xs?.length ? xs.map((x) => `<li class="${nu.has(x.toLowerCase()) ? 'new' : ''}">${fmt(x)}</li>`).join('') : `<li>${pend}</li>`;
+    setHTML($(el), xs?.length ? xs.map((x) => `<li class="${nu.has(x.toLowerCase()) ? 'new' : ''}">${fmt(x)}</li>`).join('') : `<li>${pend}</li>`);
   };
   list('people', f.people?.slice(-5), newSet(f.people, pf.people));
   const ni = newSet(f.interests, pf.interests);
   const tag = (x) => esc(x);
-  $('interests').innerHTML = f.interests?.length ? f.interests.slice(-8).map((x) => `<span class="tag ${ni.has(x.toLowerCase()) ? 'new' : ''}">${tag(x)}</span>`).join('') : pend;
+  setHTML($('interests'), f.interests?.length ? f.interests.slice(-8).map((x) => `<span class="tag ${ni.has(x.toLowerCase()) ? 'new' : ''}">${tag(x)}</span>`).join('') : pend);
   list('phrases', s.signature_phrases?.slice(0, 5), newSet(s.signature_phrases, ps.signature_phrases), (x) => `«${esc(x)}»`);
 
   fillerList = s.fillers || [];
   countFillers();
 
-  $('lang').innerHTML = langRows(s);
+  if (setHTML($('lang'), langRows(s))) showPitch();
   rescan();
 }
 // Första meningen räcker; blir den för lång för raden rullar den (se marquee()).
@@ -225,12 +235,12 @@ function scrollIfClipped(el) {
   const cs = getComputedStyle(el);
   const avail = el.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
   const over = span.getBoundingClientRect().width - avail;
-  if (over <= 6) { span.style.animation = 'none'; return; } // några pixlar syns inte
+  if (over <= 1) { span.style.animation = 'none'; return; }
   span.style.setProperty('--x', `${-(over + 4)}px`);
   span.style.setProperty('--d', `${Math.max(5, over / 30).toFixed(1)}s`);
   span.style.animation = '';
 }
-const SCROLLABLE = '#ident dd, #lang dd, #people li, #phrases li, #interests .tag, #fillers .tag, #feed .row';
+const SCROLLABLE = '#ident dd, #lang dd, #people li, #phrases li, #interests .tag, #fillers .tag'; // loggen radbryts i stället
 function rescan() { requestAnimationFrame(() => document.querySelectorAll(SCROLLABLE).forEach(scrollIfClipped)); }
 document.fonts?.ready.then(rescan);
 addEventListener('resize', rescan);
@@ -247,7 +257,8 @@ function countFillers() {
   const text = ' ' + heard.filter((l) => l.role === 'user').map((l) => l.message.toLowerCase()).join(' ') + ' ';
   const count = (w) => text.split(new RegExp(`(?<![\\p{L}])${w.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\p{L}])`, 'u')).length - 1;
   const items = fillerList.map((w) => [w, count(w)]).sort((a, b) => b[1] - a[1]).slice(0, 7);
-  $('fillers').innerHTML = items.length ? items.map(([w, n]) => `<span class="tag">${esc(w)}${n ? `<b>×${n}</b>` : ''}</span>`).join('') : '<span class="pending">INSAMLING PÅGÅR</span>';
+  setHTML($('fillers'), items.length ? items.map(([w, n]) => `<span class="tag">${esc(w)}${n ? `<b>×${n}</b>` : ''}</span>`).join('') : '<span class="pending">INSAMLING PÅGÅR</span>');
+  rescan();
 }
 
 function renderStats(l) {
@@ -286,11 +297,11 @@ function measurePitch() {
   pitches.push(sr / bestLag);
   if (pitches.length > 150) pitches.shift();
   if (pitches.length >= 25 && !pitchAnnounced) { pitchAnnounced = true; feed(`GRUNDTON FASTSTÄLLD ≈ ${medianPitch()} HZ`); }
-  const row = document.getElementById('pitchRow');
-  if (row) row.textContent = pitches.length >= 10 ? `≈ ${medianPitch()} HZ` : 'MÄTER …';
+  showPitch();
 }
 function medianPitch() { const s = [...pitches].sort((a, b) => a - b); return Math.round(s[Math.floor(s.length / 2)]); }
-function pitchRow() { return `<dt>GRUNDTON</dt><dd id="pitchRow">${pitches.length >= 10 ? `≈ ${medianPitch()} HZ` : 'MÄTER …'}</dd>`; }
+function pitchRow() { return '<dt>GRUNDTON</dt><dd id="pitchRow"></dd>'; }
+function showPitch() { const r = document.getElementById('pitchRow'); if (r) r.textContent = pitches.length >= 10 ? `≈ ${medianPitch()} HZ` : 'MÄTER …'; }
 
 // ---------- röstsignatur ----------
 function resize() {
@@ -383,7 +394,6 @@ export async function erase(erased = {}) {
     tx.className = 'tx erased';
     const m = up(msgs[k]);
     tx.textContent = m;
-    scrollIfClipped(row);
     await sleep(170);
   }
   for (let k = msgs.length; k < rows.length; k++) {

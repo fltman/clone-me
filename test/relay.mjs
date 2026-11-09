@@ -46,7 +46,7 @@ console.log('kolumnbredder med lång rad (bör vara ≈ 1 : 1,55 : 1):', cols.jo
 // Kontroll: ingen text får vara klippt utan att rulla, och rullsträckan ska nå textens slut.
 const mq = await page.evaluate(() => {
   const out = { clippedNoScroll: [], scrolled: [] };
-  for (const el of document.querySelectorAll('#ident dd, #lang dd, #people li, #phrases li, #interests .tag, #fillers .tag, #feed .row')) {
+  for (const el of document.querySelectorAll('#ident dd, #lang dd, #people li, #phrases li, #interests .tag, #fillers .tag')) {
     const span = el.querySelector(':scope > .mq');
     const cs = getComputedStyle(el);
     const avail = el.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
@@ -56,8 +56,16 @@ const mq = await page.evaluate(() => {
   }
   return out;
 });
+// Kontroll: rullande text ska få rulla ostört — inte byggas om vid varje uppdatering från servern.
+const kept = await page.evaluate(async () => {
+  const spans = [...document.querySelectorAll('.mq')];
+  spans.forEach((sp) => (sp.dataset.mark = '1'));
+  await new Promise((r) => setTimeout(r, 7000)); // minst tre uppdateringar
+  return { före: spans.length, kvar: spans.filter((sp) => sp.isConnected).length };
+});
+console.log(`rullande text kvar efter 7 s: ${kept.kvar} av ${kept.före}`);
 console.log('klippt utan rullning:', mq.clippedNoScroll.length ? mq.clippedNoScroll : 'inga');
-console.log('rullande (rest vid slutläget, bör vara ≈ -4 px):', JSON.stringify(mq.scrolled));
+console.log('rullande (rest vid slutläget, ska vara ≤ 0 px, ≈ -4):', JSON.stringify(mq.scrolled));
 await page.click('#endBtn');
 await page.waitForTimeout(5000);
 if (process.env.SHOT2) await page.screenshot({ path: process.env.SHOT2 });

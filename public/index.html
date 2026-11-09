@@ -135,7 +135,8 @@
   /* Händelseloggen: raderna behåller sin höjd; nya läggs till nertill och de äldsta försvinner upptill. */
   #feedPanel { display: flex; flex-direction: column; }
   #feed { flex: 1 1 0; min-height: 0; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end; }
-  #feed .row { flex: none; line-height: 1.15; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #feed .row { flex: none; line-height: 1.15; overflow-wrap: anywhere; }
+  #feed .row + .row { margin-top: .12em; }
   #feed .warn { color: var(--amber); }
   #feed .crit { color: var(--red); }
   #feed .cur::after { content: "█"; animation: blink .8s steps(1) infinite; }
