@@ -32,6 +32,17 @@ if (process.env.SHOT0) { await page.waitForTimeout(2600); await page.screenshot(
 
 await page.waitForTimeout(SECONDS * 1000);
 if (process.env.SHOT) await page.screenshot({ path: process.env.SHOT });
+// Kontroll: en mycket lång rad får inte trycka ut kolumnen.
+const cols = await page.evaluate(() => {
+  const ul = document.getElementById('people');
+  const li = document.createElement('li');
+  li.innerHTML = '<span class="mq">' + 'TRE BARN, VARAV ETT 13 ÅR OCH ETT 6 ÅR, OCH EN MYCKET LÅNG RAD SOM INTE FÅR PLATS '.repeat(3) + '</span>';
+  ul.appendChild(li);
+  const w = [...document.querySelectorAll('main > .col')].map((c) => Math.round(c.getBoundingClientRect().width));
+  li.remove();
+  return w;
+});
+console.log('kolumnbredder med lång rad (bör vara ≈ 1 : 1,55 : 1):', cols.join(' / '));
 // Kontroll: ingen text får vara klippt utan att rulla, och rullsträckan ska nå textens slut.
 const mq = await page.evaluate(() => {
   const out = { clippedNoScroll: [], scrolled: [] };

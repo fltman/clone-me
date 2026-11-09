@@ -93,9 +93,10 @@
   .levels b.on.l1 { background: var(--red); border-color: var(--red); box-shadow: 0 0 .7em var(--red); }
   @keyframes lvl { 50% { filter: brightness(.7); } }
 
-  main { display: grid; grid-template-columns: 1fr 1.55fr 1fr; gap: .45em; min-height: 0; }
-  .col { display: flex; flex-direction: column; gap: .45em; min-height: 0; }
-  .panel { position: relative; border: 2px solid var(--g3); background: var(--panel); padding: .3em .45em .4em; min-height: 0; overflow: hidden; flex: none; }
+  /* minmax(0, …): annars växer en kolumn till sin längsta orörliga rad i stället för att låta den rulla */
+  main { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.55fr) minmax(0, 1fr); gap: .45em; min-height: 0; }
+  .col { display: flex; flex-direction: column; gap: .45em; min-height: 0; min-width: 0; }
+  .panel { position: relative; border: 2px solid var(--g3); background: var(--panel); padding: .3em .45em .4em; min-height: 0; min-width: 0; overflow: hidden; flex: none; }
   .panel::before, .panel::after { content: ""; position: absolute; width: .4em; height: .4em; border: 2px solid var(--g2); }
   .panel::before { top: -2px; left: -2px; border-right: 0; border-bottom: 0; }
   .panel::after { bottom: -2px; right: -2px; border-left: 0; border-top: 0; }
@@ -125,7 +126,7 @@
   .scope .l2 { bottom: 0; left: .2em; color: var(--amber); }
   .scope .who { position: absolute; top: 0; right: .2em; font-size: .7em; letter-spacing: .1em; }
 
-  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: .4em; }
+  .stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .4em; }
   .stat .k { color: var(--g2); font-size: .6em; letter-spacing: .1em; }
   .stat .v { font-size: 1.9em; line-height: .95; }
   .bar { height: .18em; background: var(--g3); margin-top: .1em; }
