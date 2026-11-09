@@ -1,5 +1,7 @@
 # clone-me
 
+[![Support me on Patreon](https://img.shields.io/badge/Patreon-Support%20my%20work-FF424D?style=flat&logo=patreon&logoColor=white)](https://www.patreon.com/AndersBjarby)
+
 Ett experiment: en röstagent i ElevenLabs som under samtalens gång blir mer och mer lik den den pratar med.
 Den låter som du, heter som du, har dina intressen och använder dina ord.
 
@@ -52,3 +54,7 @@ Byggt för att visas på en videokanon inför en stor publik. All text skalar me
 ## Data
 
 Varje körning börjar från noll: ett klick på brytaren skapar en ny deltagare. Under samtalet ligger ljud, transkript och profiler i `data/p/<id>/`. "AVSLUTA OCH RADERA" raderar deltagarens kloner hos ElevenLabs och hela mappen. Körningar som aldrig avslutades ordentligt (stängd flik, tappat nät) raderas automatiskt efter 15 minuter.
+
+## Licens
+
+MIT, se [LICENSE](LICENSE).
